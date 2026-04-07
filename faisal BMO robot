@@ -1,0 +1,11 @@
+import random
+
+def read_sensor():
+    return random.randint(0, 100)
+
+value = read_sensor()
+
+if value > 50:
+    print("Obstacle detected!")
+else:
+    print("Path is clear")
