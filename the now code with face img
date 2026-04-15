@@ -1,0 +1,245 @@
+import sounddevice as sd
+import queue
+import json
+import os
+import pygame
+from vosk import Model, KaldiRecognizer
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# =========================
+# 🧠 SPEECH MODEL
+# =========================
+model = Model("vosk-model-small-en-us-0.15")
+
+# =========================
+# 🎤 AUDIO
+# =========================
+q = queue.Queue()
+
+def callback(indata, frames, time, status):
+    q.put(bytes(indata))
+
+# =========================
+# 🖼️ FACE SYSTEM
+# =========================
+pygame.init()
+screen = pygame.display.set_mode((480, 320))
+
+def show_face(path):
+    img = pygame.image.load(path)
+    img = pygame.transform.scale(img, (480, 320))
+    screen.blit(img, (0, 0))
+    pygame.display.update()
+
+IDLE = "faces/idle.png"
+LISTENING = "faces/listening.png"
+TALKING = "faces/talking.png"
+
+# =========================
+# 🗣️ SPEAK FUNCTION
+# =========================
+def speak(text):
+    show_face(TALKING)
+    os.system(f'espeak-ng "{text}"')
+    show_face(IDLE)
+
+# =========================
+# 🧠 KNOWLEDGE BASE
+# =========================
+questions = [
+    "hello",
+    "hi",
+    "how are you",
+    "what is your name",
+    "what can you do",
+    "goodbye",
+    "stop"
+]
+
+answers = [
+    "Hello friend",
+    "Hello friend",
+    "I am fine thank you",
+    "I am your robot assistant",
+    "I can listen and talk offline",
+    "Goodbye",
+    "Stopping now"
+]
+
+vectorizer = TfidfVectorizer()
+X = vectorizer.fit_transform(questions)
+
+def brain(text):
+    user_vec = vectorizer.transform([text])
+    sim = cosine_similarity(user_vec, X)
+
+    best = sim.argmax()
+    confidence = sim[0][best]
+
+    if confidence < 0.3:
+        return "I did not understand"
+
+    return answers[best]
+
+# =========================
+# 🎤 START SYSTEM
+# =========================
+with sd.RawInputStream(
+    samplerate=16000,
+    blocksize=8000,
+    dtype='int16',
+    channels=1,
+    callback=callback
+):
+
+    recognizer = KaldiRecognizer(model, 16000)
+
+import sounddevice as sd
+import queue
+import json
+import os
+import pygame
+from vosk import Model, KaldiRecognizer
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# =========================
+# 🧠 SPEECH MODEL
+# =========================
+model = Model("vosk-model-small-en-us-0.15")
+
+# =========================
+# 🎤 AUDIO
+# =========================
+q = queue.Queue()
+
+def callback(indata, frames, time, status):
+    q.put(bytes(indata))
+
+# =========================
+# 🖼️ FACE SYSTEM
+# =========================
+pygame.init()
+screen = pygame.display.set_mode((480, 320))
+
+def show_face(path):
+    img = pygame.image.load(path)
+    img = pygame.transform.scale(img, (480, 320))
+    screen.blit(img, (0, 0))
+    pygame.display.update()
+
+IDLE = "faces/idle.png"
+LISTENING = "faces/listening.png"
+TALKING = "faces/talking.png"
+
+# =========================
+# 🗣️ SPEAK FUNCTION
+# =========================
+def speak(text):
+    show_face(TALKING)
+    os.system(f'espeak-ng "{text}"')
+    show_face(IDLE)
+
+# =========================
+# 🧠 KNOWLEDGE BASE
+# =========================
+questions = [
+    "hello",
+    "hi",
+    "how are you",
+    "what is your name",
+    "what can you do",
+    "goodbye",
+    "stop"
+]
+
+answers = [
+    "Hello friend",
+    "Hello friend",
+    "I am fine thank you",
+    "I am your robot assistant",
+    "I can listen and talk offline",
+    "Goodbye",
+    "Stopping now"
+]
+
+vectorizer = TfidfVectorizer()
+X = vectorizer.fit_transform(questions)
+
+def brain(text):
+    user_vec = vectorizer.transform([text])
+    sim = cosine_similarity(user_vec, X)
+
+    best = sim.argmax()
+    confidence = sim[0][best]
+
+    if confidence < 0.3:
+        return "I did not understand"
+
+    return answers[best]
+
+# =========================
+# 🎤 START SYSTEM
+# =========================
+with sd.RawInputStream(
+    samplerate=16000,
+    blocksize=8000,
+    dtype='int16',
+    channels=1,
+    callback=callback
+):
+
+    recognizer = KaldiRecognizer(model, 16000)
+
+    print("🤖 Robot Ready...")
+
+    show_face(IDLE)
+
+    while True:
+        show_face(LISTENING)
+
+        data = q.get()
+
+        if recognizer.AcceptWaveform(data):
+            result = json.loads(recognizer.Result())
+            text = result.get("text", "")
+
+            if text != "":
+                print("You said:", text)
+
+                reply = brain(text)
+                print("Robot:", reply)
+
+                speak(reply)
+
+                if "stop" in text or "goodbye" in text:
+                    break
+
+                show_face(IDLE)    print("🤖 Robot Ready...")
+
+    show_face(IDLE)
+
+    while True:
+        show_face(LISTENING)
+
+        data = q.get()
+
+        if recognizer.AcceptWaveform(data):
+            result = json.loads(recognizer.Result())
+            text = result.get("text", "")
+
+            if text != "":
+                print("You said:", text)
+
+                reply = brain(text)
+                print("Robot:", reply)
+
+                speak(reply)
+
+                if "stop" in text or "goodbye" in text:
+                    break
+
+                show_face(IDLE)
