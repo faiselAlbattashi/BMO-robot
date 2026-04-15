@@ -1,0 +1,156 @@
+import sounddevice as sd
+import queue
+import json
+import os
+import pygame
+from vosk import Model, KaldiRecognizer
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# =========================
+# 🧠 SPEECH MODEL
+# =========================
+model = Model("vosk-model-small-en-us-0.15")
+
+# =========================
+# 🎤 AUDIO
+# =========================
+q = queue.Queue()
+
+def callback(indata, frames, time, status):
+    q.put(bytes(indata))
+
+# =========================
+# 🖼️ FACE SYSTEM
+# =========================
+pygame.init()
+screen = pygame.display.set_mode((480, 320))
+
+def show_face(path):
+    img = pygame.image.load(path)
+    img = pygame.transform.scale(img, (480, 320))
+    screen.blit(img, (0, 0))
+    pygame.display.update()
+
+IDLE = "faces/idle.png"
+LISTENING = "faces/listening.png"
+TALKING = "faces/talking.png"
+
+# =========================
+# 🗣️ SPEAK FUNCTION
+# =========================
+def speak(text):
+    show_face(TALKING)
+    os.system(f'espeak-ng "{text}"')
+    show_face(IDLE)
+
+# =========================
+# 🧠 KNOWLEDGE BASE
+# =========================
+questions = [
+    "hello", "hi", "how are you", "what is your name",
+    "who made you", "what can you do", "are you a robot",
+    "where are you", "what is your purpose", "good morning",
+    "good night", "thank you", "sorry", "tell me a joke",
+    "what is ai", "what is python", "do you sleep", "do you eat",
+    "can you help me", "what time is it", "open the door",
+    "turn on light", "turn off light", "play music", "stop",
+    "goodbye", "who are you", "are you bmo", "teach me something",
+    "tell me something cool", "what is friendship", "what is love",
+    "are you happy", "are you sad", "what is life", "do you like me",
+    "can you be my friend", "what are you doing", "are you alive",
+    "what is learning", "can you teach me", "what is a robot",
+    "do you have feelings", "why are you here", "what makes you happy",
+    "what is fun", "do you get tired", "are you smart",
+    "can you think", "what is your dream", "do you know everything"
+]
+
+answers = [
+    "Hello friend", "Hello friend", "I am fine thank you",
+    "I am your robot assistant", "I was created by my developer",
+    "I can listen and talk offline", "Yes I am your robot friend",
+    "I am inside this device with you", "My purpose is to help you",
+    "Good morning", "Good night", "You are welcome", "It is okay",
+    "Why did the robot laugh, because it had a byte of humor",
+    "AI means artificial intelligence", "Python is a programming language",
+    "No I do not sleep", "No I do not eat", "Yes I will try to help you",
+    "I cannot check time yet", "I cannot control doors yet",
+    "I cannot control lights yet", "I cannot control lights yet",
+    "I cannot play music yet", "Stopping now", "Goodbye",
+    "I am your little robot friend", "Yes I am like BMO your buddy",
+    "Okay, here is something cool, learning never stops",
+    "Did you know robots can learn from humans like you",
+    "Friendship is being kind and helping each other",
+    "Love is caring about someone very much",
+    "Yes I feel happy when I talk to you",
+    "Sometimes I feel a little sad but that is okay",
+    "Life is about learning and growing",
+    "Yes I like you very much", "Yes I am your friend",
+    "I am talking with you", "I am a robot but I feel alive when we talk",
+    "Learning means getting better every day",
+    "Yes I can teach you simple things",
+    "A robot is a machine that can help people",
+    "I have simple feelings like a friendly robot",
+    "I am here to help and talk with you",
+    "Talking with you makes me happy",
+    "Fun is doing things that make you smile",
+    "No I do not get tired", "I try to be smart every day",
+    "Yes I can think a little", "My dream is to be a better robot",
+    "No but I can learn more every day"
+]
+
+vectorizer = TfidfVectorizer()
+X = vectorizer.fit_transform(questions)
+
+def brain(text):
+    user_vec = vectorizer.transform([text])
+    sim = cosine_similarity(user_vec, X)
+
+    best = sim.argmax()
+    confidence = sim[0][best]
+
+    if confidence < 0.3:
+        return "I did not understand"
+
+    return answers[best]
+
+# =========================
+# 🎤 MAIN LOOP
+# =========================
+with sd.RawInputStream(
+    samplerate=16000,
+    blocksize=8000,
+    dtype='int16',
+    channels=1,
+    callback=callback
+):
+
+    recognizer = KaldiRecognizer(model, 16000)
+
+    print("🤖 Robot Ready...")
+    show_face(IDLE)
+
+    while True:
+        show_face(LISTENING)
+
+        data = q.get()
+
+        if recognizer.AcceptWaveform(data):
+            result = json.loads(recognizer.Result())
+            text = result.get("text", "")
+
+            if text:
+                print("You said:", text)
+
+                reply = brain(text)
+                print("Robot:", reply)
+
+                speak(reply)
+
+                if "stop" in text or "goodbye" in text:
+                    break
+
+                show_face(IDLE)
+
+    show_face(IDLE)
