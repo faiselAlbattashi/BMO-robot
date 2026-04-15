@@ -1,0 +1,103 @@
+import sounddevice as sd
+import queue
+import json
+import os
+from vosk import Model, KaldiRecognizer
+
+# 🧠 SMART AI
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# -----------------------
+# LOAD MODEL
+# -----------------------
+model = Model("vosk-model-small-en-us-0.15")
+
+# -----------------------
+# AUDIO
+# -----------------------
+q = queue.Queue()
+
+def callback(indata, frames, time, status):
+    q.put(bytes(indata))
+
+# -----------------------
+# SPEAK
+# -----------------------
+def speak(text):
+    os.system(f'espeak-ng "{text}"')
+
+# -----------------------
+# KNOWLEDGE
+# -----------------------
+questions = [
+    "hello",
+    "hi",
+    "how are you",
+    "what is your name",
+    "what can you do",
+    "goodbye",
+    "stop"
+]
+
+answers = [
+    "Hello friend",
+    "Hello friend",
+    "I am fine thank you",
+    "I am your robot assistant",
+    "I can listen and talk offline",
+    "Goodbye",
+    "Stopping now"
+]
+
+# TRAIN
+vectorizer = TfidfVectorizer()
+X = vectorizer.fit_transform(questions)
+
+# -----------------------
+# BRAIN
+# -----------------------
+def brain(user_input):
+    user_vec = vectorizer.transform([user_input])
+    similarity = cosine_similarity(user_vec, X)
+
+    best_match = similarity.argmax()
+    confidence = similarity[0][best_match]
+
+    if confidence < 0.3:
+        return "I did not understand"
+
+    return answers[best_match]
+
+# -----------------------
+# MAIN LOOP
+# -----------------------
+with sd.RawInputStream(
+    samplerate=16000,
+    blocksize=8000,
+    dtype='int16',
+    channels=1,
+    callback=callback
+):
+
+    recognizer = KaldiRecognizer(model, 16000)
+
+    print("🎤 Smart Robot Listening...")
+
+    while True:
+        data = q.get()
+
+        if recognizer.AcceptWaveform(data):
+            result = json.loads(recognizer.Result())
+            text = result.get("text", "")
+
+            if text != "":
+                print("You said:", text)
+
+                reply = brain(text)
+                print("Robot:", reply)
+
+                speak(reply)
+
+                if "stop" in text or "goodbye" in text:
+                    break
